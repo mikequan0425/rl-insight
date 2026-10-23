@@ -30,7 +30,7 @@ For offline Recipe utilities, see the
    :maxdepth: 2
    :caption: Tuning Guides
 
-   Async RL Training Tuning Guide <tuning_case/async_mode_tuning_tutorial_en>
+   Async RL Training Tuning Guide <tuning_case/async_mode_tuning_tutorial>
 
 .. toctree::
    :hidden:
