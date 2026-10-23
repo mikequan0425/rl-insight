@@ -81,9 +81,9 @@ During `separate async` initialization:
 
 The replica count shown in monitoring can therefore be larger than the number of standalone Rollouters. In the following example, there are 32 replicas in total, and replicas `0-7` are Hybrid Engines colocated with the Trainer.
 
-![Separate async replica initialization and rank assignment](../../assets/doc/async_mode_tuning/image%2021.png)
+![Separate async replica initialization and rank assignment](../../assets/doc/async_mode_tuning/image1.png)
 
-![Hybrid Engines mapped to replicas 0-7](../../assets/doc/async_mode_tuning/image%2011.png)
+![Hybrid Engines mapped to replicas 0-7](../../assets/doc/async_mode_tuning/image2.png)
 
 Before tuning, distinguish Hybrid Engines from standalone Rollouters. Do not infer standalone inference resources directly from the total replica count.
 
@@ -93,7 +93,7 @@ In the experimental implementation, Hybrid Engines switch to rollout mode in `on
 
 It is therefore expected to see Hybrid Engines generating around validation:
 
-![Hybrid Engines generating during validation](../../assets/doc/async_mode_tuning/image%209.png)
+![Hybrid Engines generating during validation](../../assets/doc/async_mode_tuning/image3.png)
 
 If validation runs at a fixed interval and the Trainer is clearly idle during it, enabling this feature can remove periodic validation bubbles. **This feature is already enabled by default in Trainer V1's Separate Async mode.**
 
@@ -112,15 +112,15 @@ Baseline configuration:
 
 The baseline timeline shows substantial Rollouter bubbles:
 
-![Qwen3-30B baseline timeline](../../assets/doc/async_mode_tuning/image%208.png)
+![Qwen3-30B baseline timeline](../../assets/doc/async_mode_tuning/image4.png)
 
 The sequence length distribution is shown below. Length variance must be considered when analyzing load imbalance:
 
-![Qwen3-30B sequence length distribution](../../assets/doc/async_mode_tuning/img_v3_0213l_0df55db5-647a-4fe0-ac70-39ee23faef9g.jpg)
+![Qwen3-30B sequence length distribution](../../assets/doc/async_mode_tuning/image5.jpg)
 
 Reducing Rollout nodes from 48 to 32 decreased inference bubbles and improved end-to-end throughput by approximately **25%**:
 
-![Throughput after reducing Rollout nodes from 48 to 32](../../assets/doc/async_mode_tuning/image%2024.png)
+![Throughput after reducing Rollout nodes from 48 to 32](../../assets/doc/async_mode_tuning/image6.png)
 
 This case demonstrates that adding inference resources does not necessarily improve throughput when Rollouters consistently run ahead of the Trainer. Removing excess Rollouters can reduce bubbles and improve throughput per device.
 
@@ -140,35 +140,35 @@ Initial configuration:
 
 With `r8t8`, Hybrid Engines can participate in rollout before the first replay buffer sample completes. However, inference is much faster than training overall, so Rollouters run approximately five PPO mini-batches ahead of the Trainer and then remain idle.
 
-![r8t8 timeline](../../assets/doc/async_mode_tuning/image%203.png)
+![r8t8 timeline](../../assets/doc/async_mode_tuning/image7.png)
 
-![r8t8 load details](../../assets/doc/async_mode_tuning/image%2022.png)
+![r8t8 load details](../../assets/doc/async_mode_tuning/image8.png)
 
-![r8t8 bubble details](../../assets/doc/async_mode_tuning/image%2016.png)
+![r8t8 bubble details](../../assets/doc/async_mode_tuning/image9.png)
 
 In the `r4t12` experiment, enabling switching unexpectedly reduced the number of requests handled by each replica:
 
-![Requests per replica after enabling switching with r4t12](../../assets/doc/async_mode_tuning/image%2018.png)
+![Requests per replica after enabling switching with r4t12](../../assets/doc/async_mode_tuning/image10.png)
 
 This behavior must be interpreted together with the total request count and divisibility across replicas. The experiment added Trainer resources to satisfy the distribution constraint:
 
-![Request distribution after adding Trainer resources](../../assets/doc/async_mode_tuning/image%202.png)
+![Request distribution after adding Trainer resources](../../assets/doc/async_mode_tuning/image11.png)
 
 For comparison, the following result uses `r8` with switching disabled:
 
-![r8 with switching disabled](../../assets/doc/async_mode_tuning/image%2014.png)
+![r8 with switching disabled](../../assets/doc/async_mode_tuning/image12.png)
 
 With `r8t16`, increasing `warm_up_batch` to 2 while keeping the other core parameters unchanged reduced the bubble from approximately five to three PPO mini-batches, but there was still room for improvement:
 
-![r8t16 with warm_up_batch=2](../../assets/doc/async_mode_tuning/image%206.png)
+![r8t16 with warm_up_batch=2](../../assets/doc/async_mode_tuning/image13.png)
 
 Training memory still had headroom, so the PPO max token value was raised from 10k to 30k to increase training-side work per iteration. The rollout bubble decreased further to approximately 1.5 mini-batches:
 
-![Timeline after increasing PPO max token to 30k](../../assets/doc/async_mode_tuning/image%2013.png)
+![Timeline after increasing PPO max token to 30k](../../assets/doc/async_mode_tuning/image14.png)
 
 The overall throughput comparison is shown below:
 
-![Throughput comparison across separate async configurations](../../assets/doc/async_mode_tuning/image%2030.png)
+![Throughput comparison across separate async configurations](../../assets/doc/async_mode_tuning/image15.png)
 
 The tuning sequence in this case was to rebalance training and rollout resources first, then use available memory to raise the PPO token budget. Before increasing the token budget, confirm memory headroom and retain a safety margin.
 
@@ -182,9 +182,9 @@ Staleness allows Rollouters to continue generating with older parameter versions
 
 The yellow lines in the following timeline mark parameter version boundaries:
 
-![Parameter version timeline with staleness=0.3](../../assets/doc/async_mode_tuning/image%2027.png)
+![Parameter version timeline with staleness=0.3](../../assets/doc/async_mode_tuning/image16.png)
 
-![Load overview with staleness=0.3](../../assets/doc/async_mode_tuning/img_v3_0213m_4a24fab5-e4b3-4c0c-9b77-a8b644ba134g.jpg)
+![Load overview with staleness=0.3](../../assets/doc/async_mode_tuning/image17.jpg)
 
 The timeline reveals two types of bubbles:
 
@@ -193,7 +193,7 @@ The timeline reveals two types of bubbles:
    - Validation every five steps makes the Trainer periodically idle. `use_trainer_do_validate` can switch the Trainer to rollout mode so it participates in validation.
    - The current trigger step is 8. In the experiment, `0.3 / (1/8) > 2`, so extra samples can cover the first two trigger steps. Later Trainer bubbles are mainly caused by waiting for Rollouters.
 
-![Bubble breakdown with staleness=0.3](../../assets/doc/async_mode_tuning/image%2020.png)
+![Bubble breakdown with staleness=0.3](../../assets/doc/async_mode_tuning/image18.png)
 
 There are two candidate strategies:
 
@@ -204,15 +204,15 @@ There are two candidate strategies:
 
 **staleness = 0.3**
 
-![Load with staleness=0.3](../../assets/doc/async_mode_tuning/image%2010.png)
+![Load with staleness=0.3](../../assets/doc/async_mode_tuning/image19.png)
 
 **staleness = 0.5**
 
-![Load with staleness=0.5](../../assets/doc/async_mode_tuning/img_v3_0213r_2d57c6bf-cea7-4670-b2e7-0a77ca2f088g.jpg)
+![Load with staleness=0.5](../../assets/doc/async_mode_tuning/image20.jpg)
 
 **staleness = 0.7**
 
-![Load with staleness=0.7](../../assets/doc/async_mode_tuning/image%2015.png)
+![Load with staleness=0.7](../../assets/doc/async_mode_tuning/image21.png)
 
 Experimental findings:
 
@@ -223,9 +223,9 @@ Experimental findings:
 
 | `timing_s/gen` across staleness settings | Reward across staleness settings |
 | :---: | :---: |
-| ![timing_s/gen across staleness settings](../../assets/doc/async_mode_tuning/image%2023.png) | ![Reward across staleness settings](../../assets/doc/async_mode_tuning/image%2012.png) |
+| ![timing_s/gen across staleness settings](../../assets/doc/async_mode_tuning/image22.png) | ![Reward across staleness settings](../../assets/doc/async_mode_tuning/image23.png) |
 | **Accuracy across staleness settings** | **Comparison of RS + IS strategies** |
-| ![Accuracy across staleness settings](../../assets/doc/async_mode_tuning/image%204.png) | ![Comparison of RS + IS strategies](../../assets/doc/async_mode_tuning/image%201.png) |
+| ![Accuracy across staleness settings](../../assets/doc/async_mode_tuning/image24.png) | ![Comparison of RS + IS strategies](../../assets/doc/async_mode_tuning/image25.png) |
 
 For this case, `0.5` is a more reasonable starting candidate: it removes most of the waiting while retaining lower off-policy risk than `0.7`. This is not a universal optimum and must be validated on the target workload.
 
